@@ -1,2 +1,5 @@
 sample_file: 'sample_reads.tsv'
+ref_ftp: 'https://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz'
+
+
 
