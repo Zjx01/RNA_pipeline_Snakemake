@@ -37,9 +37,11 @@ rule all:
     input:expand("results/fastqc/{sample}",sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_R1.fastq.gz", sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_R2.fastq.gz", sample=config["sample_reads"]),
-        expand("results/trimmed/{sample}/{sample}_merged.fastq.gz", sample=config["sample_reads"]),
-        "resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-
+        expand("results/trimmed/{sample}/{sample}_merged.fastq", sample=config["sample_reads"]),
+        "resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
+        expand("results/metagenome/{sample}/{sample}.fastq",sample=config["sample_reads"]),
+        expand("results/metagenome/{sample}/{sample}.fasta",sample=config["sample_reads"]),
+        expand("results/contigs/{sample}",sample=config["sample_reads"])
 	
 rule fastqc:
     input: get_input_fastq
@@ -62,7 +64,7 @@ rule trim:
     output:
         r1="results/trimmed/{sample}/{sample}_R1.fastq.gz",
         r2="results/trimmed/{sample}/{sample}_R2.fastq.gz",
-        merged="results/trimmed/{sample}/{sample}_merged.fastq.gz"
+        merged="results/trimmed/{sample}/{sample}_merged.fastq"
     log:
         "logs/fastp-trim/{sample}.log"
     threads: 1
@@ -92,46 +94,93 @@ rule human_filter_reference:
         "wget --no-check-certificate -O {output} {params.url}"
 
 
-rule human_filter_bowtie2_index:
-    input: rules.human_filter_reference.output
-    output:
-        multiext(
-            "resources/Homo_sapiens.GRCh38.dna.primary_assembly",
-            ".1.bt2",
-            ".2.bt2",
-            ".3.bt2",
-            ".4.bt2",
-            ".rev.1.bt2",
-            ".rev.2.bt2"
-        )
-    log: "logs/human_filter/bowtie2/index.log"
-    threads: 30
-    resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
-    conda: "envs/bowtie2.yaml"
-    shell:
-        "bowtie2-build"
-        " --threads {threads}"
-        " {input}"
-        " resources/Homo_sapiens.GRCh38.dna.primary_assembly"
-        " &> {log}"
+#rule human_filter_bowtie2_index:
+#    input: rules.human_filter_reference.output
+#    output:
+#        multiext(
+#            "resources/Homo_sapiens.GRCh38.dna.primary_assembly",
+#            ".1.bt2",
+#            ".2.bt2",
+#            ".3.bt2",
+#            ".4.bt2",
+#            ".rev.1.bt2",
+#            ".rev.2.bt2"
+#       )
+#    log: "logs/human_filter/bowtie2/index.log"
+#    threads: 30
+#    resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
+#    conda: "envs/bowtie2.yaml"
+#    shell:
+#        "bowtie2-build"
+#        " --threads {threads}"
+#        " {input}"
+#        " resources/Homo_sapiens.GRCh38.dna.primary_assembly"
+#        " &> {log}"
+
+
+#rule human_genome_filter:
+#    input:
+#        index=rules.human_filter_bowtie2_index.output,
+#        #merged_fq="results/trimmed/{sample}/{sample}_merged.fastq"
+#        merged_fq=rules.trim.output.merged
+#    output:
+#        metagenome="results/metagenome/{sample}/{sample}.fastq"
+#    log: "logs/human_filter/bowtie2/humangenome_filter/{sample}.log"
+#    conda: "envs/bowtie2.yaml"
+#    threads: 20
+#    # resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
+#    shell:
+#        "bowtie2"
+#        " --threads {threads}"
+#        " -x resources/Homo_sapiens.GRCh38.dna.primary_assembly"
+#        " -U {input.merged_fq}"
+#        " --un {output.metagenome}"
+#        " &> {log}" 
 
 
 rule human_genome_filter:
     input:
-        index=rules.human_filter_bowtie2_index.output,
-        merged_fq=rules.trim.output[2]
+        #index=rules.human_filter_bowtie2_index.output,
+        merged_fq="results/trimmed/{sample}/{sample}_merged.fastq"
+        #merged_fq=rules.trim.output.merged
     output:
         metagenome="results/metagenome/{sample}/{sample}.fastq"
     log: "logs/human_filter/bowtie2/humangenome_filter/{sample}.log"
     conda: "envs/bowtie2.yaml"
     threads: 20
-    # resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
+    resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
     shell:
         "bowtie2"
         " --threads {threads}"
-        " -x resources/Homo_sapiens.GRCh38.dna.primary_assembly"
-        " -U {merged_fq}"
-        " -un {metagenome}"
+        " -x /Users/zhaoj11/Documents/RNA_pipeline_Snakemake/resources/Homo_sapiens.GRCh38.dna.primary_assembly"
+        " -U {input.merged_fq}"
+        " --un {output.metagenome}"
         " &> {log}" 
+
+
+rule fq2fa:
+    input: rules.human_genome_filter.output.metagenome
+    output:
+        metagenome_fa="results/metagenome/{sample}/{sample}.fasta"  
+    log:"logs/human_filter/seqtk/fq2fa/{sample}.log"
+    conda:"envs/seqtk.yaml"
+    threads: 10
+    shell:
+        "seqtk seq -a {input} > {output}"
+        " &> {log}" 
+
+
+rule get_contig:
+    input: rules.fq2fa.output.metagenome_fa
+    output:
+        directory("results/contigs/{sample}/")
+    log:"logs/contigs/megahit/{sample}.log"
+    conda:"envs/megahit.yaml"
+    threads:20
+    resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 20000)
+    group:"contig_assembly"
+    shell:
+        "megahit -r {input} -o {output}"
+        " &> {log}"
 
 
