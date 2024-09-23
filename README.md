@@ -27,4 +27,12 @@ mamba create -c conda-forge -c bioconda -n snakemake snakemake
 mamba activate snakemake
 snakemake --help
 ```
-3. 
+
+### To run the workflow
+```text
+# Dry Run 
+snakemake  --use-conda --rerun-triggers mtime  --rerun-incomplete -np
+# Running 
+snakemake  --use-conda --rerun-triggers mtime  --rerun-incomplete 
+```
+
