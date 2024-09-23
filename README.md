@@ -8,7 +8,7 @@
 ```text
 mkdir RNA_pipeline_snakemake
 cd RNA_pipline_snakemake
-git clone 
+git clone git@github.com:Zjx01/RNA_pipeline_Snakemake.git
 ```
 
 ### 2. Make Sure you have snakemake and conda environment installed
