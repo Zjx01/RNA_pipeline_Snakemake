@@ -11,7 +11,7 @@ min_version("8.8.0")
 #### setup report ####
 #### configfile:"config/config.yaml"####
 
-with open('/Users/zhaoj11/Documents/RNA_pipeline_Snakemake/config/config.yaml', 'r') as config_file:
+with open('config/config.yaml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
 
@@ -32,22 +32,51 @@ config['sample_reads'] = sample_reads
 
 def get_input_fastq(wildcards):
     return config['sample_reads'][wildcards.sample]
-    
+
+
 rule all:
-    input:expand("results/fastqc/{sample}",sample=config["sample_reads"]),
+    input:
+        ###fastqc###
+        expand("results/fastqc/{sample}",sample=config["sample_reads"]),
+        ###fastp-QC###
         expand("results/trimmed/{sample}/{sample}_R1.fastq.gz", sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_R2.fastq.gz", sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_merged.fastq", sample=config["sample_reads"]),
-        "resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
+        ###bowtie2-reference genome/human genome filter"####
+        #"resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
         expand("results/metagenome/{sample}/{sample}.fastq",sample=config["sample_reads"]),
         expand("results/metagenome/{sample}/{sample}.fasta",sample=config["sample_reads"]),
-        expand("results/contigs/{sample}",sample=config["sample_reads"])
+        # ###contig###
+        expand("results/contigs/{sample}/final.contigs.fa",sample=config["sample_reads"]),
+        "results/contigs/all_contigs.fasta",
+        "results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"]),
+        "results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"]),
+        ###minimap2###
+        "results/minimap2/length{LEN}up.all_contigs.sorted.mmi".format(LEN=config["contig_filter_length"]),
+        expand("results/minimap2/contig_bam/{sample}.bam",sample=config["sample_reads"]),
+        "results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"]),
+        expand("results/minimap2/gene_bam/{sample}.bam",sample=config["sample_reads"]),
+        # expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
+        # expand("results/minimap2/contig_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
+        ###bam_check###
+        expand("results/minimap2/corrupted_bam_genes/"),
+        expand("results/minimap2/corrupted_bam_contigs"),
+        ###vamb###
+        "results/vamb/contigs",
+        # "results/vamb/genes",
+        ###prodigal###
+        "results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"])
+   
+
+
 	
 rule fastqc:
     input: get_input_fastq
     output: directory("results/fastqc/{sample}/") 
-    log:
-    	"logs/fastqc/{sample}.log"
+    log:"logs/fastqc/{sample}.log"
     threads:1
     resources:
         mem_mb = 20000
@@ -59,8 +88,8 @@ rule fastqc:
 
 rule trim:
     input:
-        "/Users/zhaoj11/Documents/BinPipeline/fastq/{sample}_R1.fastq.gz",
-        "/Users/zhaoj11/Documents/BinPipeline/fastq/{sample}_R2.fastq.gz"
+        r1="raw_data/{sample}_R1.fastq.gz",
+        r2="raw_data/{sample}_R2.fastq.gz"
     output:
         r1="results/trimmed/{sample}/{sample}_R1.fastq.gz",
         r2="results/trimmed/{sample}/{sample}_R2.fastq.gz",
@@ -73,8 +102,8 @@ rule trim:
     shell:
         """
         fastp \
-            --in1 {input[0]} \
-            --in2 {input[1]} \
+            --in1 {input.r1} \
+            --in2 {input.r2} \
             --out1 {output.r1} \
             --out2 {output.r2} \
             -q 20 -m --merged_out {output.merged} \
@@ -118,44 +147,26 @@ rule human_filter_reference:
 #        " &> {log}"
 
 
-#rule human_genome_filter:
-#    input:
-#        index=rules.human_filter_bowtie2_index.output,
-#        #merged_fq="results/trimmed/{sample}/{sample}_merged.fastq"
-#        merged_fq=rules.trim.output.merged
-#    output:
-#        metagenome="results/metagenome/{sample}/{sample}.fastq"
-#    log: "logs/human_filter/bowtie2/humangenome_filter/{sample}.log"
-#    conda: "envs/bowtie2.yaml"
-#    threads: 20
-#    # resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
-#    shell:
-#        "bowtie2"
-#        " --threads {threads}"
-#        " -x resources/Homo_sapiens.GRCh38.dna.primary_assembly"
-#        " -U {input.merged_fq}"
-#        " --un {output.metagenome}"
-#        " &> {log}" 
 
 
 rule human_genome_filter:
-    input:
-        #index=rules.human_filter_bowtie2_index.output,
-        merged_fq="results/trimmed/{sample}/{sample}_merged.fastq"
-        #merged_fq=rules.trim.output.merged
-    output:
-        metagenome="results/metagenome/{sample}/{sample}.fastq"
-    log: "logs/human_filter/bowtie2/humangenome_filter/{sample}.log"
-    conda: "envs/bowtie2.yaml"
-    threads: 20
-    resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
-    shell:
-        "bowtie2"
-        " --threads {threads}"
-        " -x /Users/zhaoj11/Documents/RNA_pipeline_Snakemake/resources/Homo_sapiens.GRCh38.dna.primary_assembly"
-        " -U {input.merged_fq}"
-        " --un {output.metagenome}"
-        " &> {log}" 
+   input:
+       #index=rules.human_filter_bowtie2_index.output,
+       #merged_fq="results/trimmed/{sample}/{sample}_merged.fastq"
+       merged_fq=rules.trim.output.merged
+   output:
+       metagenome="results/metagenome/{sample}/{sample}.fastq"
+   log: "logs/human_filter/bowtie2/humangenome_filter/{sample}.log"
+   conda: "envs/bowtie2.yaml"
+   threads: 20
+   # resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 40960)
+   shell:
+       "bowtie2"
+       " --threads {threads}"
+       " -x resources/Homo_sapiens.GRCh38.dna.primary_assembly" #{index}
+       " -U {input.merged_fq}"
+       " --un {output.metagenome}"
+       " &> {log}" 
 
 
 rule fq2fa:
@@ -166,21 +177,273 @@ rule fq2fa:
     conda:"envs/seqtk.yaml"
     threads: 10
     shell:
-        "seqtk seq -a {input} > {output}"
-        " &> {log}" 
+        "seqtk seq -a {input} > {output} 2> {log}" 
+
 
 
 rule get_contig:
     input: rules.fq2fa.output.metagenome_fa
-    output:
-        directory("results/contigs/{sample}/")
+    params: outdir = "results/contigs/{sample}"
+    output: 
+        "results/contigs/{sample}/final.contigs.fa"
     log:"logs/contigs/megahit/{sample}.log"
     conda:"envs/megahit.yaml"
-    threads:20
+    threads: 20
     resources: mem_mb=lambda wildcards, input, attempt: max(input.size_mb * 4 * attempt, 20000)
-    group:"contig_assembly"
+    group: "contig_assembly"
     shell:
-        "megahit -r {input} -o {output}"
-        " &> {log}"
+        """
+        rm -rf {params.outdir}
+        megahit -r {input} -o {params.outdir} -t {threads}
+        &> {log}
+        """
 
 
+rule unify_all_contigs:
+    input: expand("results/contigs/{sample}/final.contigs.fa", sample=config['sample_reads'])
+    output: "results/contigs/all_contigs.fasta"
+    log: "logs/contigs/all_contig.log"
+    group: "contig_assembly"
+    threads: 10
+    shell:
+        """
+        for f in {input}; do sample_name=$(basename $(dirname $f)); sed "s/>/>${{sample_name}}_/g" $f >> {output}; done &> {log}
+        """
+
+
+
+
+rule contig_filter:
+    input:
+        "results/contigs/all_contigs.fasta"
+    params: 
+        LEN=config["contig_filter_length"]  
+    output:
+        contig_filtered="results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"])
+    log: 
+        "logs/contigs/contig_filter.log"
+    group: "contig_assembly"
+    shell:
+        """
+        sed 's/len=/len= /g' {input} | \
+        awk '{{if($0 ~ /^>/ && $5 >= {params.LEN}) {{print "\\n"$0; getline; print;}}}}' | \
+        sed '/^$/d'| \
+        sed '/^>/ s/ .*//' > {output.contig_filtered}
+        &> {log}
+        """
+
+
+rule contig_filter_sort:
+    input:
+        rules.contig_filter.output.contig_filtered
+    output:
+        contig_filtered_sorted="results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"])
+    log:
+        "logs/contigs/contig_filter_sort.log"
+    group: "contig_assembly"
+    shell:
+        """
+        awk '/^>/ {{if (seq) print seq; seq=""; print $0; next}} {{seq=seq$0}} END {{if (seq) print seq}}' {input} | \
+        paste - - | \
+        sort -t$'\t' -k1,1 | \
+        tr "\t" "\n" > {output.contig_filtered_sorted}
+        """
+
+
+rule build_minimap2_contig_index:
+    input:
+        contig=rules.contig_filter_sort.output.contig_filtered_sorted,
+    params:
+        LEN=config["contig_filter_length"]
+    output:
+        contig_index="results/minimap2/length{LEN}up.all_contigs.sorted.mmi".format(LEN=config["contig_filter_length"])
+    log:
+        "logs/minimap2/index_build_contig_length{params.LEN}.log",
+    group:
+        "minimap2"
+    threads: 10
+    conda:
+        "envs/minimap2.yaml"
+    shell:
+        """
+        minimap2 -d {output.contig_index} {input.contig} &> {log}       
+        """
+
+
+
+rule minimap2_contig_mapping:
+    input:
+        contig_index=rules.build_minimap2_contig_index.output,
+        hm_removal_fa=rules.fq2fa.output.metagenome_fa
+    output: 
+        contig_bam="results/minimap2/contig_bam/{sample}.bam"
+    log: 
+        "logs/minimap2/alignment/contig_bam/{sample}.log"
+    conda: 
+        "envs/minimap2.yaml"  
+    threads: 20
+    group: "minimap2"
+    shell:
+        """
+        minimap2 -t {threads} -N 5 -ax sr {input.contig_index} {input.hm_removal_fa} | \
+        samtools view -F 3584 -b --threads {threads} > {output.contig_bam} 2> {log}
+        """
+
+rule prodigal:
+    input:
+        "results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"])
+    output:
+        cds_fa="results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
+        protein_fa="results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
+        prediction="results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"])
+    log:"logs/prodigal/prodigal.log"
+    conda:
+        "envs/prodigal.yaml"
+    threads:10
+    shell:
+        "prodigal -i {input} -d {output.cds_fa} -o {output.prediction} -a {output.protein_fa} 2> {log}"
+
+
+rule contig_gene_filter:
+    input:
+        rules.prodigal.output.cds_fa
+    params:
+        G_LEN=config["contig_gene_length"],
+        LEN=config["contig_filter_length"]
+    output:
+        "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"], LEN=config["contig_filter_length"])
+    log:"logs/prodigal/contig_gene_filter.log"
+    shell:
+        """
+        awk 'BEGIN {{RS=">"; FS="\\n"}} NR>1 {{header=$1; seq=""; for (i=2; i<=NF; i++) seq=seq $i; if (length(seq) > {params.G_LEN}) {{print ">" header "\\n" seq}}}}' {input}|sed '/^>/ s/ .*//' > {output} \
+        2> {log}
+        """
+
+
+
+rule build_minimap2_gene_index:
+    input:
+        gene=rules.contig_gene_filter.output
+    params:
+        G_LEN=config["contig_gene_length"],
+        LEN=config["contig_filter_length"]
+    output:
+        gene_index="results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"])
+    log:
+        "logs/minimap2/index_build_gene_length{params.G_LEN}.log"
+    group:
+        "minimap2"
+    threads: 10
+    conda:
+        "envs/minimap2.yaml"
+    shell:
+        """
+        minimap2 -d {output.gene_index} {input.gene} &> {log}
+        """
+
+# examine the gene expression level in each sample
+rule minimap2_gene_mapping:
+    input:
+        gene_index=rules.build_minimap2_gene_index.output,
+        hm_removal_fa=rules.fq2fa.output.metagenome_fa
+    output:
+        gene_bam="results/minimap2/gene_bam/{sample}.bam"
+    log: "logs/minimap2/alignment/gene_bam/{sample}.log"
+    conda:"envs/minimap2.yaml"  
+    threads:20
+    group:"minimap2"
+    shell:
+        """
+        minimap2 -t {threads} -N 5 -ax sr {input.gene_index} {input.hm_removal_fa} | samtools view -F 3584 -b --threads {threads} > {output.gene_bam} 2> {log}
+        """        
+
+
+rule bam_quality_check:
+    input:
+        gene_bam_dir="results/minimap2/gene_bam",
+        contig_bam_dir="results/minimap2/contig_bam"
+    output:
+        corrupted_bam_genes=directory("results/minimap2/corrupted_bam_genes/"),
+        corrupted_bam_contigs=directory("results/minimap2/corrupted_bam_contigs/")
+    threads: 2
+    log:
+        gene_log="logs/minimap2/samtools/gene_bam_quality_check.log",
+        contig_log="logs/minimap2/samtools/contig_bam_quality_check.log"
+    conda:
+        "envs/minimap2.yaml" 
+    shell:
+        """
+        mkdir -p {output.corrupted_bam_genes}
+        mkdir -p {output.corrupted_bam_contigs}
+
+        for f in {input.gene_bam_dir}/*.bam; do
+            samtools quickcheck -v $f || mv $f {output.corrupted_bam_genes}
+        done &> {log.gene_log}
+
+        for f in {input.contig_bam_dir}/*.bam; do
+            samtools quickcheck -v $f || mv $f {output.corrupted_bam_contigs}
+        done &> {log.contig_log}
+        """
+
+
+
+# rule sort_bam:
+#     input:
+#         gene_bam = rules.minimap2_gene_mapping.output.gene_bam,
+#         contig_bam = rules.minimap2_contig_mapping.output.contig_bam
+#     output:
+#         gene_bam_sorted = "results/minimap2/gene_bam_sorted/{sample}.sort.bam",
+#         contig_bam_sorted = "results/minimap2/contig_bam_sorted/{sample}.sort.bam"
+
+#     threads:10
+#     log: gene_sort_log = "logs/minimap2/samtools/gene_bam_sort/{sample}.log",
+#          contig_sort_log = "logs/minimap2/samtools/contig_bam_sort/{sample}.log"
+#     conda:
+#         "envs/minimap2.yaml" 
+#     group:"minimap2"
+#     shell:
+#         """
+#         samtools sort -n {input.gene_bam} --threads {threads} -o {output.gene_bam_sorted} 
+#         &> {log.gene_sort_log}
+        
+#         samtools sort -n {input.contig_bam} --threads {threads} -o {output.contig_bam_sorted}
+#         &> {log.contig_sort_log}
+#         """
+
+        
+
+rule vamb_rpkm_contig:
+    input:
+        bam=expand("results/minimap2/contig_bam/{sample}.bam", sample=config['sample_reads']),
+        fasta="results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"])
+    params:
+        minimum_contig_length=config["vamb_minimum_contig_length"],
+    output:
+        directory("results/vamb/contigs")
+    log: "logs/vamb/vamb_rpkm_contig.log"
+    conda:
+        "envs/vamb.yaml"
+    threads:10
+    group:"vamb"
+    shell:
+        "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C --minfasta {params.minimum_contig_length}"
+
+
+# rule vamb_rpkm_gene:
+#     input:
+#         bam=expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam", sample=config['sample_reads']),
+#         fasta="results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"])
+#     output:
+#         directory("results/vamb/genes")
+#     log: "logs/vamb/vamb_rpkm_gene.log"
+#     conda:
+#         "envs/vamb.yaml"
+#     threads:10
+#     group:"vamb"
+#     shell:
+#         "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C -m 100"
+
+
+
+
+##### identify genes/proteins from different organism ###

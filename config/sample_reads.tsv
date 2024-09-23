@@ -1,2 +1,5 @@
-MV1D1964032	/Users/zhaoj11/Documents/BinPipeline/fastq/MV1D1964032_R?.fastq.gz	
-MV1D1968097	/Users/zhaoj11/Documents/BinPipeline/fastq/MV1D1968097_R?.fastq.gz
+MV1D1964032	raw_data/MV1D1964032_R?.fastq.gz	
+MV1D1968097	raw_data/MV1D1968097_R?.fastq.gz
+BS1D1000644	raw_data/BS1D1000644_R?.fastq.gz
+BS1D1004075	raw_data/BS1D1004075_R?.fastq.gz
+BS1D1014017	raw_data/BS1D1014017_R?.fastq.gz
