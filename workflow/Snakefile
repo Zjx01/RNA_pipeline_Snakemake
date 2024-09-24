@@ -36,39 +36,39 @@ def get_input_fastq(wildcards):
 
 rule all:
     input:
-#         ###fastqc###
-#         expand("results/fastqc/{sample}",sample=config["sample_reads"]),
-#         ###fastp-QC###
-#         expand("results/trimmed/{sample}/{sample}_R1.fastq.gz", sample=config["sample_reads"]),
-#         expand("results/trimmed/{sample}/{sample}_R2.fastq.gz", sample=config["sample_reads"]),
-#         expand("results/trimmed/{sample}/{sample}_merged.fastq", sample=config["sample_reads"]),
-#         ###bowtie2-reference genome/human genome filter"####
-#         #"resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
-#         expand("results/metagenome/{sample}/{sample}.fastq",sample=config["sample_reads"]),
-#         expand("results/metagenome/{sample}/{sample}.fasta",sample=config["sample_reads"]),
-#         # ###contig###
-#         expand("results/contigs/{sample}/final.contigs.fa",sample=config["sample_reads"]),
-#         "results/contigs/all_contigs.fasta",
-#         "results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"]),
-#         "results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"]),
-#         ###minimap2###
-#         "results/minimap2/length{LEN}up.all_contigs.sorted.mmi".format(LEN=config["contig_filter_length"]),
-#         expand("results/minimap2/contig_bam/{sample}.bam",sample=config["sample_reads"]),
-#         "results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"]),
-#         expand("results/minimap2/gene_bam/{sample}.bam",sample=config["sample_reads"]),
-#         # expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
-#         # expand("results/minimap2/contig_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
-#         ###bam_check###
-        expand("results/minimap2/corrupted_bam_genes"),
-        expand("results/minimap2/corrupted_bam_contigs"),
+        ###fastqc###
+        expand("results/fastqc/{sample}",sample=config["sample_reads"]),
+        ###fastp-QC###
+        expand("results/trimmed/{sample}/{sample}_R1.fastq.gz", sample=config["sample_reads"]),
+        expand("results/trimmed/{sample}/{sample}_R2.fastq.gz", sample=config["sample_reads"]),
+        expand("results/trimmed/{sample}/{sample}_merged.fastq", sample=config["sample_reads"]),
+        ###bowtie2-reference genome/human genome filter"####
+        #"resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
+        expand("results/metagenome/{sample}/{sample}.fastq",sample=config["sample_reads"]),
+        expand("results/metagenome/{sample}/{sample}.fasta",sample=config["sample_reads"]),
+        # ###contig###
+        expand("results/contigs/{sample}/final.contigs.fa",sample=config["sample_reads"]),
+        "results/contigs/all_contigs.fasta",
+        "results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"]),
+        "results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"]),
+        ###minimap2###
+        "results/minimap2/length{LEN}up.all_contigs.sorted.mmi".format(LEN=config["contig_filter_length"]),
+        expand("results/minimap2/contig_bam/{sample}.bam",sample=config["sample_reads"]),
+        "results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"]),
+        expand("results/minimap2/gene_bam/{sample}.bam",sample=config["sample_reads"]),
+        # expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
+        # expand("results/minimap2/contig_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
+        ###bam_check###
+        # expand("results/minimap2/corrupted_bam_genes"),
+        # expand("results/minimap2/corrupted_bam_contigs"),
         ###vamb###
         "results/vamb/contigs",
         "results/vamb/genes",
-#         ###prodigal###
-#         "results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
-#         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
-#         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"]),
-#         "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"])
+        ###prodigal###
+        "results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"]),
+        "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"])
         ###csv###
 
 
