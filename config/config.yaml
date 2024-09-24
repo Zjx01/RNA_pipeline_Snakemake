@@ -14,4 +14,3 @@ contig_gene_length: '100'
 
 vamb_minimum_contig_length: '200000'
 vamb_minimum_gene_length: '100'
-batch_size: '128'
