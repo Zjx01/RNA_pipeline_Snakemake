@@ -15,7 +15,7 @@ git clone git@github.com:Zjx01/RNA_pipeline_Snakemake.git
 
 - Taking the VCU apollo cluster as an example, you should activate your conda environment with snakemake installed.
 ```text
-module load miniforge
+module load miniforge3
 conda activate snakemake
 ```
 
