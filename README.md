@@ -1,4 +1,4 @@
-# Metatranscriptomics Workflow 
+# MetaGenomics Workflow 
 
 
 ## Introduction 
