@@ -59,17 +59,34 @@ rule all:
         # expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
         # expand("results/minimap2/contig_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
         ###bam_check###
-        # expand("results/minimap2/corrupted_bam_genes"),
-        # expand("results/minimap2/corrupted_bam_contigs"),
+        #"results/minimap2/corrupted_bam_genes",
+        #"results/minimap2/corrupted_bam_contigs",
         ###vamb###
         "results/vamb/contigs",
         "results/vamb/genes",
+        ###vamb_rpkm_tabulation###
+        "results/rpkm/contigs_rpkm.csv",
+        "results/rpkm/genes_rpkm.csv",
+        "results/rpkm/contigs/contigs_lengths.csv",
+        "results/rpkm/genes/gene_lengths.csv",
+        "results/rpkm/reads/sample_total_reads.csv",
+        "results/rpkm/contigs/contig_reads_table.csv",
+        ###vamb_reads###
+        expand("results/rpkm/reads/total_reads/{sample}.total_reads", sample=config["sample_reads"]),
+        expand("results/rpkm/reads/reads/{sample}.reads", sample=config["sample_reads"]),
         ###prodigal###
         "results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"]),
-        "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"])
-        ###csv###
+        "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"]),
+        ###checkM###
+        "results/checkM/checkm_data_db",
+        "results/checkM/SGB",
+	    ###viral###
+        #"results/viral/vsorter/db",
+        #"results/viral/vsorter/vsorter2",
+        "results/viral/vibrant",
+        # "results/viral/vibrant_db_done.txt"
 
 
 	
@@ -319,8 +336,7 @@ rule contig_gene_filter:
         2> {log}
         """
 
-
-#这个log name 之后要更改一下
+#change log name
 rule build_minimap2_gene_index:
     input:
         gene=rules.contig_gene_filter.output
@@ -330,7 +346,7 @@ rule build_minimap2_gene_index:
     output:
         gene_index="results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"])
     log:
-        "logs/minimap2/index_build_gene_length{params.G_LEN}.log"
+        "logs/minimap2/index_build_gene_length{G_LEN}.log".format(G_LEN=config["contig_gene_length"])
     group:
         "minimap2"
     threads: 10
@@ -358,59 +374,36 @@ rule minimap2_gene_mapping:
         """        
 
 
-# rule bam_quality_check:
-#     input:
-#         gene_bam_dir="results/minimap2/gene_bam",
-#         contig_bam_dir="results/minimap2/contig_bam"
-#     output:
-#         corrupted_bam_genes=directory("results/minimap2/corrupted_bam_genes/"),
-#         corrupted_bam_contigs=directory("results/minimap2/corrupted_bam_contigs/")
-#     threads: 2
-#     log:
-#         gene_log="logs/minimap2/samtools/gene_bam_quality_check.log",
-#         contig_log="logs/minimap2/samtools/contig_bam_quality_check.log"
-#     conda:
-#         "envs/minimap2.yaml" 
-#     shell:
-#         """
-#         mkdir -p {output.corrupted_bam_genes}
-#         mkdir -p {output.corrupted_bam_contigs}
+#rule bam_quality_check:
+#    input:
+        #gene_bam=expand("results/minimap2/gene_bam/{sample}.bam", sample=config["sample_reads"]),
+        #contig_bam=expand("results/minimap2/contig_bam/{sample}.bam", sample=config["sample_reads"])
+	#gene_bam_dir="results/minimap2/gene_bam",
+	#contig_bam_dir="results/minimap2/contig_bam"
+#    output:
+        #corrupted_bam_genes=directory("results/minimap2/corrupted_bam_genes/"),
+        #corrupted_bam_contigs=directory("results/minimap2/corrupted_bam_contigs/")
+#    threads: 2
+#    log:
+#        gene_log="logs/minimap2/samtools/gene_bam_quality_check.log",
+#        contig_log="logs/minimap2/samtools/contig_bam_quality_check.log"
+#    conda:
+#        "envs/minimap2.yaml" 
+#    shell:
+#        """
+        #mkdir -p {output.corrupted_bam_genes}
+        #mkdir -p {output.corrupted_bam_contigs}
 
-#         for f in {input.gene_bam_dir}/*.bam; do
-#             samtools quickcheck -v $f || mv $f {output.corrupted_bam_genes}
-#             echo "Corrupted gene BAM moved: $f" >> {log.gene_log}
+        #for f in {input.gene_bam}; do
+        #    samtools quickcheck -v $f || mv $f {output.corrupted_bam_genes}
+        #    echo "Corrupted gene BAM moved: $f" >> {log.gene_log}
 
-#         done
-#         for f in {input.contig_bam_dir}/*.bam; do
-#             samtools quickcheck -v $f || mv $f {output.corrupted_bam_contigs}
-#             "Corrupted contig BAM moved: $f" >> {log.contig_log}
-#         done 
-#         """
-
-
-
-# rule sort_bam:
-#     input:
-#         gene_bam = rules.minimap2_gene_mapping.output.gene_bam,
-#         contig_bam = rules.minimap2_contig_mapping.output.contig_bam
-#     output:
-#         gene_bam_sorted = "results/minimap2/gene_bam_sorted/{sample}.sort.bam",
-#         contig_bam_sorted = "results/minimap2/contig_bam_sorted/{sample}.sort.bam"
-
-#     threads:10
-#     log: gene_sort_log = "logs/minimap2/samtools/gene_bam_sort/{sample}.log",
-#          contig_sort_log = "logs/minimap2/samtools/contig_bam_sort/{sample}.log"
-#     conda:
-#         "envs/minimap2.yaml" 
-#     group:"minimap2"
-#     shell:
-#         """
-#         samtools sort -n {input.gene_bam} --threads {threads} -o {output.gene_bam_sorted} 
-#         &> {log.gene_sort_log}
-        
-#         samtools sort -n {input.contig_bam} --threads {threads} -o {output.contig_bam_sorted}
-#         &> {log.contig_sort_log}
-#         """
+        #done
+        #for f in {input.contig_bam}; do
+        #    samtools quickcheck -v $f || mv $f {output.corrupted_bam_contigs}
+        #    "Corrupted contig BAM moved: $f" >> {log.contig_log}
+        #done 
+ #       """
 
         
 
@@ -428,8 +421,8 @@ rule vamb_rpkm_contig:
     threads:10
     group:"vamb"
     shell:
-        "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C --minfasta {params.minimum_contig_length}"
-
+        "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C --minfasta {params.minimum_contig_length} 2> {log}"
+        
 
 
 rule vamb_rpkm_gene:
@@ -446,5 +439,189 @@ rule vamb_rpkm_gene:
     threads:10
     group:"vamb"
     shell:
-        "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C --minfasta {params.minimum_gene_length}"
+        "vamb --outdir {output}  --fasta {input.fasta} --bamfiles {input.bam} -o C --minfasta {params.minimum_gene_length} 2> {log}"
+
+
+rule RPKM_conversion:
+    input:
+        contigs_rpkm_raw = "results/vamb/contigs/rpkm.npz",
+        gene_rpkm_raw = "results/vamb/genes/rpkm.npz"  
+    output:
+        rpkm_contigs = "results/rpkm/contigs_rpkm.csv",
+        rpkm_genes = "results/rpkm/genes_rpkm.csv",
+        contigs_lengths = "results/rpkm/contigs/contigs_lengths.csv",
+        genes_lengths = "results/rpkm/genes/gene_lengths.csv"
+    log: "logs/vamb/rpkm_conversion.log"
+    run:
+        import pandas as pd
+        import numpy as np  
+
+        # Load the RPKM data
+        contig_rpkm_data = np.load(input.contigs_rpkm_raw)
+        gene_rpkm_data = np.load(input.gene_rpkm_raw)
+
+        with open(output.rpkm_contigs, 'w') as f:
+            for key, value in contig_rpkm_data.items():
+                np.savetxt(f, value, delimiter=",")
+        
+        with open(output.rpkm_genes, 'w') as f:
+            for key, value in gene_rpkm_data.items():
+                np.savetxt(f, value, delimiter=",")
+
+        contig_length_data = np.load('results/vamb/contigs/lengths.npz')
+        gene_length_data = np.load('results/vamb/genes/lengths.npz')
+        
+        with open(output.contigs_lengths, 'w') as f:
+            for key, value in contig_length_data.items():
+                np.savetxt(f, value, delimiter=",")
+        
+        with open(output.genes_lengths, 'w') as f:
+            for key, value in gene_length_data.items():
+                np.savetxt(f, value, delimiter=",")
+
+rule bam2totalreads:
+### -F 260 get all the aligned reads that does not have a secondary mapping
+    input:
+        contigs_bam="results/minimap2/contig_bam/{sample}.bam"
+    output:
+        contigs_bam_totalreads="results/rpkm/reads/total_reads/{sample}.total_reads"
+    log:  "logs/vamb/bam2totalreads_{sample}.log"
+    conda:"envs/minimap2.yaml"
+    threads:20
+    shell:
+        "samtools view -c -F 260 {input.contigs_bam} > {output.contigs_bam_totalreads} 2> {log}"
+    
+
+rule bam2reads:
+#unique reads 
+    input:
+        contigs_bam="results/minimap2/contig_bam/{sample}.bam"
+    output:
+        contigs_bam_reads="results/rpkm/reads/reads/{sample}.reads"
+    log: "logs/vamb/bam2toreads_{sample}.log"
+    conda:"envs/minimap2.yaml"
+    threads:20
+    shell:
+        "samtools view -F 260 {input.contigs_bam} | awk '!seen[$1]++' | cut -f 3 | sort | uniq -c > {output.contigs_bam_reads} 2> {log}"
+        
+
+rule sample_total_reads:
+    input:
+        total_reads=expand("results/rpkm/reads/total_reads/{sample}.total_reads", sample=config['sample_reads'])
+    output:
+        total_reads_csv="results/rpkm/reads/sample_total_reads.csv"
+    log: "logs/read/sample_total_reads.log"
+    shell:
+        """
+        for i in {input.total_reads}; do
+            echo -n "$(basename "$i" .total_reads), "; 
+            cat "$i"; 
+        done > {output.total_reads_csv} 2>{log}
+        """
+
+rule contig_reads_table:
+    input:
+        sample_total_reads="results/rpkm/reads/sample_total_reads.csv",
+        rpkm="results/rpkm/contigs/formated_contigs_rpkm.csv",
+        contig_lenth="results/rpkm/contigs/formated_contigs_length.csv"
+    output:
+        contig_reads_table="results/rpkm/contigs/contig_reads_table.csv"
+    log:"logs/vamb/contigs_reads_table.log"
+    threads:20
+    shell:
+        r"""
+        Rscript workflow/scripts/RPKM2reads.R --rpkm {input.rpkm} --contig_length {input.contig_lenth} --sample_total_reads {input.sample_total_reads} --output {output.contig_reads_table} 2> {log}
+        """
+
+
+rule checkM_setup:
+    params:
+        url=config["checkM_url"]
+    output:
+        directory("results/checkM/checkm_data_db")
+    conda:"envs/checkkm.yaml"
+    log:"logs/checkM/db_setup.log"
+    threads:20
+    shell:
+        """
+        wget --no-check-certificate {params.url} -O checkm_data.tar.gz > {log} 2>&1
+   	    mkdir -p {output}
+   	    tar -xvzf checkm_data.tar.gz -C {output} >> {log} 2>&1
+   	    rm checkm_data.tar.gz >> {log} 2>&1
+	    checkm data setRoot {output}
+	    """
+
+
+rule checkM_SGB:
+    input:
+        bins="results/vamb/contigs/bins"
+    output:
+        checkM_dir=directory("results/checkM/SGB")
+    log:"logs/checkM/checkM_contigs.log"
+    conda:"envs/checkkm.yaml"
+    threads:60
+    group:"checkM"
+    shell:
+        "checkm lineage_wf -t {threads} {input.bins} {output.checkM_dir} > {log} 2>&1"
+
+
+
+#### Find potential viruses within the assembly
+#rule vibrant_db:
+#    output:"results/viral/vibrant_db_done.txt"
+#    log:"logs/viral/vibrant/vibrant_db.log"
+#    group:"viral"
+#    shell:
+#        """
+#        if [ ! -d "VIBRANT" ]; then
+#            git clone https://github.com/AnantharamanLab/VIBRANT >> {log} 2>&1
+#            chmod -R 777 VIBRANT
+#        fi
+#	cd VIBRANT/databases
+#	./VIBRANT_setup.py >> {log} 2>&1
+#        echo "vibrant db initiated" > {output}
+#	"""
+
+rule vibrant:
+    input:rules.contig_filter.output.contig_filtered
+    output:directory("results/viral/vibrant")
+    log: "logs/viral/vibrant/vibrant.log"
+    conda: "envs/vibrant.yaml"
+    threads:50
+    group:"viral"
+    shell:
+        """
+        VIBRANT/VIBRANT_run.py -i {input} -t {threads} -folder {output} 2> {log}
+        """ 
+
+
+
+#rule virosorter_db:
+#    params:
+#        url=config["vsorter_url"]
+#    output:
+#        directory("results/viral/vsorter/db")
+#    log:"logs/viral/virosorter/vsorter_db.log"
+#    conda:"envs/virosorter.yaml"
+#    threads:50
+#    group:"viral"
+#    shell:
+#        """
+#        wget --no-check-certificate -O db.tgz {params.url} > {log} 2>&1
+#        mkdir -p {output}
+#        tar --strip-components=1 -xzf db.tgz -C {output} >> {log} 2>&1 
+#	"""
+
+#rule virosorter:
+#    input:rules.contig_filter.output.contig_filtered
+#    output:directory("results/viral/vsorter/vsorter2")
+#    log:"logs/viral/virosorter/vsorter2.log"
+#    conda:"vs2"
+#    group:"viral"
+#    threads:50
+#    shell:
+#        """
+#        virsorter run -w {output} -i {input} -j {threads} >> {log} 2>&1
+#        """
+
 

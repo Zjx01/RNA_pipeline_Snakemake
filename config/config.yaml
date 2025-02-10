@@ -6,6 +6,8 @@ file_dir: 'raw_data'
 
 
 ref_ftp: 'https://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz'
+checkM_url: 'https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz'
+vsorter_url: 'https://osf.io/v46sc/download'
 
 contig_filter_length: '1500'
 contig_gene_length: '100'
