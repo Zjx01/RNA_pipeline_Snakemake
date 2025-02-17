@@ -467,7 +467,7 @@ rule RPKM_conversion:
         with open(output.rpkm_genes, 'w') as f:
             for key, value in gene_rpkm_data.items():
                 np.savetxt(f, value, delimiter=",")
-
+	# 这里需要改一下 不是绝对引用 改成相对引用
         contig_length_data = np.load('results/vamb/contigs/lengths.npz')
         gene_length_data = np.load('results/vamb/genes/lengths.npz')
         
