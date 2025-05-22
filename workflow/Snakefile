@@ -25,13 +25,33 @@ with open(config['sample_file']) as fh:
             for path in glob.glob(f)
         ]
         if len(files) != 2:
-            raise ValueError(f"Expected two read files per samples, {fields[0]} has {len(files)}: {files}")
+           raise ValueError(f"Expected two read files per samples, {fields[0]} has {len(files)}: {files}")
         sample_reads[fields[0]] = files
 config['sample_reads'] = sample_reads
 
-
-def get_input_fastq(wildcards):
+def get_input_fastqs(wildcards):
     return config['sample_reads'][wildcards.sample]
+
+
+def get_input_fastq_r1(wildcards):
+    """Selects the R1 FASTQ file dynamically based on filename pattern."""
+    files = config['sample_reads'][wildcards.sample]
+    r1_file = next((f for f in files if f.endswith("_R1.fastq.gz")), None)
+
+    if not r1_file:
+        raise ValueError(f"Missing R1 file for sample {wildcards.sample} in config.yaml")
+
+    return r1_file
+
+def get_input_fastq_r2(wildcards):
+    """Selects the R2 FASTQ file dynamically based on filename pattern."""
+    files = config['sample_reads'][wildcards.sample]
+    r2_file = next((f for f in files if f.endswith("_R2.fastq.gz")), None)
+
+    if not r2_file:
+        raise ValueError(f"Missing R2 file for sample {wildcards.sample} in config.yaml")
+
+    return r2_file
 
 
 rule all:
@@ -42,56 +62,54 @@ rule all:
         expand("results/trimmed/{sample}/{sample}_R1.fastq.gz", sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_R2.fastq.gz", sample=config["sample_reads"]),
         expand("results/trimmed/{sample}/{sample}_merged.fastq", sample=config["sample_reads"]),
-        ###bowtie2-reference genome/human genome filter"####
-        #"resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
+        # ###bowtie2-reference genome/human genome filter"#### 
+        # #"resources/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
         expand("results/metagenome/{sample}/{sample}.fastq",sample=config["sample_reads"]),
         expand("results/metagenome/{sample}/{sample}.fasta",sample=config["sample_reads"]),
-        # ###contig###
+        # # ###contig###
         expand("results/contigs/{sample}/final.contigs.fa",sample=config["sample_reads"]),
         "results/contigs/all_contigs.fasta",
         "results/filtered_contigs/length{LEN}up.all_contigs.fa".format(LEN=config["contig_filter_length"]),
         "results/filtered_contigs/length{LEN}up.all_contigs.sorted.fa".format(LEN=config["contig_filter_length"]),
-        ###minimap2###
+        # ###minimap2###
         "results/minimap2/length{LEN}up.all_contigs.sorted.mmi".format(LEN=config["contig_filter_length"]),
         expand("results/minimap2/contig_bam/{sample}.bam",sample=config["sample_reads"]),
         "results/minimap2/length{G_LEN}up.contig.genes.mmi".format(G_LEN=config["contig_gene_length"]),
         expand("results/minimap2/gene_bam/{sample}.bam",sample=config["sample_reads"]),
-        # expand("results/minimap2/gene_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
-        # expand("results/minimap2/contig_bam_sorted/{sample}.sort.bam",sample=config["sample_reads"]),
         ###bam_check###
         #"results/minimap2/corrupted_bam_genes",
         #"results/minimap2/corrupted_bam_contigs",
-        ###vamb###
+        # ###vamb###
         "results/vamb/contigs",
         "results/vamb/genes",
-        ###vamb_rpkm_tabulation###
+        # ###vamb_rpkm_tabulation###
         "results/rpkm/contigs_rpkm.csv",
         "results/rpkm/genes_rpkm.csv",
         "results/rpkm/contigs/contigs_lengths.csv",
         "results/rpkm/genes/gene_lengths.csv",
-        "results/rpkm/reads/sample_total_reads.csv",
-        "results/rpkm/contigs/contig_reads_table.csv",
-        ###vamb_reads###
-        expand("results/rpkm/reads/total_reads/{sample}.total_reads", sample=config["sample_reads"]),
-        expand("results/rpkm/reads/reads/{sample}.reads", sample=config["sample_reads"]),
-        ###prodigal###
+        # # "results/rpkm/reads/sample_total_reads.csv",
+        # # "results/rpkm/contigs/contig_reads_table.csv",
+        # ###vamb_reads###
+        # expand("results/rpkm/reads/total_reads/{sample}.total_reads", sample=config["sample_reads"]),
+        # expand("results/rpkm/reads/reads/{sample}.reads", sample=config["sample_reads"]),
+        # ###prodigal###
         "results/prodigal/length{LEN}up/contig.genes.fna".format(LEN=config["contig_filter_length"]),
         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.faa".format(LEN=config["contig_filter_length"]),
         "results/prodigal/length{LEN}up/length{LEN}up.all_contigs.out".format(LEN=config["contig_filter_length"]),
         "results/prodigal/length{LEN}up/length{G_LEN}up.contig.genes.fna".format(G_LEN=config["contig_gene_length"],LEN=config["contig_filter_length"]),
-        ###checkM###
-        "results/checkM/checkm_data_db",
-        "results/checkM/SGB",
-	    ###viral###
-        #"results/viral/vsorter/db",
-        #"results/viral/vsorter/vsorter2",
-        "results/viral/vibrant",
+        # ###checkM###
+        # "results/checkM/checkm_data_db",
+        # "results/checkM/SGB",
+	    # ###viral###
+        # #"results/viral/vsorter/db",
+        # #"results/viral/vsorter/vsorter2",
+        # "results/viral/vibrant",
         # "results/viral/vibrant_db_done.txt"
 
 
 	
 rule fastqc:
-    input: get_input_fastq
+    input: get_input_fastqs
     output: directory("results/fastqc/{sample}/") 
     log:"logs/fastqc/{sample}.log"
     threads:1
@@ -104,9 +122,9 @@ rule fastqc:
 
 
 rule trim:
-    input:
-        r1="raw_data/{sample}_R1.fastq.gz",
-        r2="raw_data/{sample}_R2.fastq.gz"
+    input: 
+        r1=get_input_fastq_r1, 
+        r2=get_input_fastq_r2
     output:
         r1="results/trimmed/{sample}/{sample}_R1.fastq.gz",
         r2="results/trimmed/{sample}/{sample}_R2.fastq.gz",
@@ -226,8 +244,6 @@ rule unify_all_contigs:
         """
         for f in {input}; do sample_name=$(basename $(dirname $f)); sed "s/>/>${{sample_name}}C/g" $f >> {output}; done &> {log}
         """
-
-
 
 
 rule contig_filter:
@@ -479,6 +495,8 @@ rule RPKM_conversion:
             for key, value in gene_length_data.items():
                 np.savetxt(f, value, delimiter=",")
 
+
+
 rule bam2totalreads:
 ### -F 260 get all the aligned reads that does not have a secondary mapping
     input:
@@ -532,6 +550,15 @@ rule contig_reads_table:
         r"""
         Rscript workflow/scripts/RPKM2reads.R --rpkm {input.rpkm} --contig_length {input.contig_lenth} --sample_total_reads {input.sample_total_reads} --output {output.contig_reads_table} 2> {log}
         """
+
+
+rule reformat_rpkm_table:
+    input:
+        # add the headers to the rpkm table 
+        
+
+
+
 
 
 rule checkM_setup:
