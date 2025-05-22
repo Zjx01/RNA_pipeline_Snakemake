@@ -1,0 +1,11 @@
+executor: slurm
+jobs: 100
+latency-wait: 60
+default-resources:
+  - mem_mb=102400
+  - time=259200
+  - threads=1
+use-conda: true
+keep-going: true
+rerun-incomplete: true
+
